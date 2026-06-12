@@ -593,6 +593,12 @@ const App = (() => {
 
       compareList.push({ userName: p.n, raw: encoded, data: p });
       saveCompareList();
+
+      // También guardar en Firebase para que todos lo vean
+      if (typeof firebaseReady !== 'undefined' && firebaseReady && typeof savePorraFB === 'function') {
+        savePorraFB(p.n, p);
+      }
+
       renderCompareList();
       input.value = "";
       showToast(`¡${p.n} añadido!`);
@@ -951,6 +957,10 @@ const App = (() => {
         if (!compareList.find(c => c.userName === data.n)) {
           compareList.push({ userName: data.n, raw: encoded, data });
           saveCompareList();
+          // También guardar en Firebase
+          if (typeof firebaseReady !== 'undefined' && firebaseReady && typeof savePorraFB === 'function') {
+            savePorraFB(data.n, data);
+          }
         }
       } catch (e) { /* ignorar enlaces inválidos */ }
     }
