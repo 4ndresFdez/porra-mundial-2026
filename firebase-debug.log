@@ -1,0 +1,19 @@
+[debug] [2026-06-12T11:12:27.715Z] ----------------------------------------------------------------------
+[debug] [2026-06-12T11:12:27.717Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\afern\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js init
+[debug] [2026-06-12T11:12:27.717Z] CLI Version:   15.20.0
+[debug] [2026-06-12T11:12:27.718Z] Platform:      win32
+[debug] [2026-06-12T11:12:27.718Z] Node Version:  v24.14.0
+[debug] [2026-06-12T11:12:27.718Z] Time:          Fri Jun 12 2026 13:12:27 GMT+0200 (hora de verano de Europa central)
+[debug] [2026-06-12T11:12:27.718Z] ----------------------------------------------------------------------
+[debug] 
+[info] 
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  C:\Users\afern\Documents\App Mundial
+
