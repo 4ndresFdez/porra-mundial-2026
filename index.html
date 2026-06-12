@@ -273,12 +273,13 @@
     <h2>💰 Apuestas del día</h2>
     <p class="help-text" id="bets-date-range"></p>
 
-    <div class="bets-bar card" style="padding:12px;margin:0 12px 8px">
-      <div class="input-row" style="margin-bottom:6px">
+    <div class="bets-bar card" style="padding:12px;margin:0 12px 8px;font-size:12px;color:var(--text-muted);text-align:center">
+      <span id="bets-status">💾 Modo local (sin Firebase)</span>
+      <div class="input-row" style="margin-top:6px;display:none" id="bets-share-row">
         <input type="text" id="input-friend-bet-link" placeholder="Pega el enlace de apuestas de un amigo..." autocomplete="off">
         <button class="btn btn-small btn-secondary" onclick="App.addFriendBet()">➕</button>
       </div>
-      <button class="btn btn-small btn-outline" onclick="App.copyBetLink()" style="width:100%">📋 Copiar enlace de MIS apuestas</button>
+      <button class="btn btn-small btn-outline" onclick="App.copyBetLink()" style="width:100%;margin-top:4px" id="bets-copy-btn">📋 Copiar enlace de MIS apuestas</button>
     </div>
 
     <div id="bets-container" class="bets-list">
@@ -354,7 +355,12 @@
   <!-- ========== TOAST ========== -->
   <div id="toast" class="toast">¡Copiado!</div>
 
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
   <script src="js/data.js"></script>
+  <script src="js/firebase-config.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

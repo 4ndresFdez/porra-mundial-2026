@@ -826,3 +826,4 @@ h3 {
   color: var(--text-muted);
 }
 .bet-friend-badge strong { color: var(--accent2); }
+.bet-friend-badge.bet-is-me { border: 1px solid var(--accent); }

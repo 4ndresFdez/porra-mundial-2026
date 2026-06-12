@@ -2,6 +2,24 @@
 
 Webapp 100% gratuita para hacer la porra del Mundial con tus amigos.
 
+## 🔥 Activar apuestas en tiempo real (opcional - 2 min)
+
+Para que las apuestas se sincronicen automáticamente entre todos SIN tener que pasar enlaces:
+
+1. Ve a **[console.firebase.google.com](https://console.firebase.google.com)**
+2. Crea un proyecto → nombre: `porra-mundial-2026`
+3. Ve a **Realtime Database** → **Crear base de datos**
+4. Ubicación: `europe-west1` (o la que quieras)
+5. **Modo de prueba** (permite lectura/escritura pública)
+6. Ve a ⚙️ **Configuración del proyecto** → **Añadir app** → **Web** (</>)
+7. Copia el objeto `firebaseConfig`
+8. Pégalo en `js/firebase-config.js` (reemplaza el placeholder)
+9. Sube los cambios: `git add . && git commit -m "firebase" && git push`
+
+¡Listo! Cuando alguien guarde una apuesta, aparecerá al instante en el móvil de todos los demás.
+
+> Sin Firebase, las apuestas se guardan en local (tu navegador) y se comparten manualmente mediante enlaces.
+
 ## 🚀 Cómo publicarla online (gratis)
 
 ### Opción 1: GitHub Pages (recomendado)

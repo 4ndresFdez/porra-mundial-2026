@@ -904,7 +904,33 @@ const App = (() => {
   // ─── Apuestas ─────────────────────────────────────────
   function showBets() {
     goTo("bets");
+
+    // Actualizar barra de estado
+    const statusEl = document.getElementById("bets-status");
+    const shareRow = document.getElementById("bets-share-row");
+    const copyBtn = document.getElementById("bets-copy-btn");
+    if (typeof firebaseReady !== 'undefined' && firebaseReady) {
+      if (statusEl) statusEl.textContent = "🔥 Apuestas en tiempo real (Firebase)";
+      if (shareRow) shareRow.style.display = "none";
+      if (copyBtn) copyBtn.style.display = "none";
+    } else {
+      if (statusEl) statusEl.textContent = "💾 Modo local - comparte tus apuestas con el enlace";
+      if (shareRow) shareRow.style.display = "flex";
+      if (copyBtn) copyBtn.style.display = "block";
+    }
+
     renderBets();
+
+    // Si Firebase está activo, suscribirse a cambios en tiempo real
+    if (typeof firebaseReady !== 'undefined' && firebaseReady && typeof listenBetsFB === 'function') {
+      listenBetsFB((allBets) => {
+        _firebaseBetsCache = allBets || {};
+        const betsScreen = document.getElementById("screen-bets");
+        if (betsScreen && betsScreen.classList.contains("active")) {
+          renderBets();
+        }
+      });
+    }
   }
 
   function getTodayRange() {
@@ -917,13 +943,29 @@ const App = (() => {
   }
 
   function loadBets() {
+    // Firebase tiene prioridad; localStorage es fallback
+    if (typeof firebaseReady !== 'undefined' && firebaseReady) {
+      return _firebaseBetsCache || {};
+    }
     try {
       const raw = localStorage.getItem("porra_mundial_2026_bets");
       return raw ? JSON.parse(raw) : {};
     } catch (e) { return {}; }
   }
 
+  // Cache local de apuestas desde Firebase
+  let _firebaseBetsCache = {};
+
   function saveBet(matchId, homeBet, awayBet) {
+    const userName = document.getElementById("input-name").value.trim() || "Anónimo";
+
+    // Firebase
+    if (typeof firebaseReady !== 'undefined' && firebaseReady && typeof saveBetFB === 'function') {
+      saveBetFB(matchId, userName, homeBet, awayBet);
+      return; // Firebase actualizará el listener y re-renderizará
+    }
+
+    // Fallback: localStorage
     const bets = loadBets();
     bets[matchId] = { home: homeBet, away: awayBet };
     try {
@@ -942,6 +984,7 @@ const App = (() => {
     const matches = getMatchesBetween(today, tomorrow);
     const bets = loadBets();
     const friendBets = loadFriendBets();
+    const userName = document.getElementById("input-name").value.trim() || "Anónimo";
 
     if (matches.length === 0) {
       container.innerHTML = '<div class="bets-none">🏟️ No hay partidos hoy ni mañana.<br>¡Vuelve cuando empiece la jornada!</div>';
@@ -950,23 +993,53 @@ const App = (() => {
 
     container.innerHTML = matches.map(m => {
       const isPlayed = m.homeScore !== undefined && m.awayScore !== undefined;
-      const bet = bets[m.id];
-      const isSaved = bet && !isPlayed;
       const flagH = getFlag(m.home);
       const flagA = getFlag(m.away);
 
-      // Apuestas de amigos para este partido
-      let friendsHtml = "";
-      const friendsForMatch = friendBets.filter(fb => fb.data && fb.data[m.id]);
-      if (friendsForMatch.length > 0) {
-        friendsHtml = `
-          <div class="bet-friends">
-            ${friendsForMatch.map(fb => {
-              const b = fb.data[m.id];
-              return `<span class="bet-friend-badge">👤 ${escHtml(fb.userName)}: <strong>${b.home}-${b.away}</strong></span>`;
-            }).join("")}
-          </div>`;
+      // Apuestas de TODOS para este partido
+      const matchBets = bets[m.id] || {};
+
+      // Si usamos Firebase, matchBets es un objeto con { userName: {home, away} }
+      // Si es localStorage, es { home, away } del usuario actual
+      let allBetsHtml = "";
+      const isFirebase = typeof firebaseReady !== 'undefined' && firebaseReady;
+
+      if (isFirebase) {
+        // Firebase: mostrar todas las apuestas de todos
+        const entries = Object.entries(matchBets);
+        if (entries.length > 0) {
+          allBetsHtml = `
+            <div class="bet-friends">
+              ${entries.map(([name, b]) => {
+                const isMe = name === userName;
+                return `<span class="bet-friend-badge ${isMe ? 'bet-is-me' : ''}">${isMe ? '⭐' : '👤'} ${escHtml(name)}: <strong>${b.home}-${b.away}</strong></span>`;
+              }).join("")}
+            </div>`;
+        }
+      } else {
+        // Fallback: localStorage + friends
+        let allBets = [];
+        const myBet = matchBets.home !== undefined ? [{ name: userName, home: matchBets.home, away: matchBets.away, isMe: true }] : [];
+        const friendBetsForMatch = friendBets.filter(fb => fb.data && fb.data[m.id])
+          .map(fb => ({ name: fb.userName, home: fb.data[m.id].home, away: fb.data[m.id].away, isMe: false }));
+        allBets = [...myBet, ...friendBetsForMatch];
+        if (allBets.length > 0) {
+          allBetsHtml = `
+            <div class="bet-friends">
+              ${allBets.map(b => `<span class="bet-friend-badge ${b.isMe ? 'bet-is-me' : ''}">${b.isMe ? '⭐' : '👤'} ${escHtml(b.name)}: <strong>${b.home}-${b.away}</strong></span>`).join("")}
+            </div>`;
+        }
       }
+
+      // Mi apuesta (para inputs)
+      let myBet = null;
+      if (isFirebase) {
+        myBet = matchBets[userName] || null;
+      } else {
+        const h = matchBets.home;
+        myBet = h !== undefined ? matchBets : null;
+      }
+      const isSaved = !!myBet && !isPlayed;
 
       if (isPlayed) {
         return `
@@ -982,7 +1055,7 @@ const App = (() => {
               <span class="bet-team-name">${flagA} ${m.away}</span>
             </div>
             <div class="bet-result">Resultado: ${m.homeScore} - ${m.awayScore}</div>
-            ${friendsHtml}
+            ${allBetsHtml}
           </div>`;
       }
 
@@ -1000,15 +1073,15 @@ const App = (() => {
           </div>
           <div class="bet-score-row">
             <input type="number" class="bet-score-input" id="bet-h-${m.id}" min="0" max="20"
-                   value="${bet ? bet.home : ''}" placeholder="-" inputmode="numeric" pattern="[0-9]*">
+                   value="${myBet ? myBet.home : ''}" placeholder="-" inputmode="numeric" pattern="[0-9]*">
             <span class="bet-score-dash">-</span>
             <input type="number" class="bet-score-input" id="bet-a-${m.id}" min="0" max="20"
-                   value="${bet ? bet.away : ''}" placeholder="-" inputmode="numeric" pattern="[0-9]*">
+                   value="${myBet ? myBet.away : ''}" placeholder="-" inputmode="numeric" pattern="[0-9]*">
           </div>
           <button class="btn btn-primary bet-save-btn" onclick="App.saveBetClick(${m.id})">
-            ${isSaved ? '✅ Apuesta guardada' : '💾 Guardar apuesta'}
+            ${isSaved ? '✅ Actualizar apuesta' : '💾 Guardar apuesta'}
           </button>
-          ${friendsHtml}
+          ${allBetsHtml}
         </div>`;
     }).join("");
   }
