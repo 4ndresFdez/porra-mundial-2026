@@ -10,14 +10,13 @@
 // 6. Copia el objeto firebaseConfig y pégalo aquí abajo
 
 const firebaseConfig = {
-  // PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE:
-  // apiKey: "AIzaSy...",
-  // authDomain: "tu-proyecto.firebaseapp.com",
-  // databaseURL: "https://tu-proyecto-default-rtdb.firebaseio.com",
-  // projectId: "tu-proyecto",
-  // storageBucket: "tu-proyecto.appspot.com",
-  // messagingSenderId: "123456789",
-  // appId: "1:123456789:web:abc123"
+  apiKey: "AIzaSyDvPQdm4Fw0KqvEtx1-zmkmatXL49WIkwU",
+  authDomain: "porra-mundial-2026-5c36b.firebaseapp.com",
+  databaseURL: "https://porra-mundial-2026-5c36b-default-rtdb.firebaseio.com",
+  projectId: "porra-mundial-2026-5c36b",
+  storageBucket: "porra-mundial-2026-5c36b.firebasestorage.app",
+  messagingSenderId: "144901629733",
+  appId: "1:144901629733:web:fe3f540d0bbd2ac8985ccc",
 };
 
 let firebaseReady = false;
