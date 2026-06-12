@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🏆 Porra Mundial 2026</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- ========== PANTALLA 1: INICIO ========== -->
+  <div id="screen-welcome" class="screen active">
+    <div class="hero">
+      <div class="trophy">🏆</div>
+      <h1>Porra del Mundial 2026</h1>
+      <p class="subtitle">El único que sabe de fútbol aquí es el Gery. Esta porra es solo para reafirmarlo.</p>
+    </div>
+
+    <div class="card welcome-card">
+      <div class="form-group">
+        <label>Tu nombre o apodo</label>
+        <input type="text" id="input-name" placeholder="Ej: Juancho" maxlength="30" autocomplete="off">
+      </div>
+
+      <div class="welcome-buttons">
+        <button class="btn btn-primary btn-big" onclick="App.startNew()">
+          ✍️  Crear mi porra
+        </button>
+        <div class="divider-text">o</div>
+        <button class="btn btn-secondary btn-big" onclick="App.showCompare()">
+          📊  Comparar porras de amigos
+        </button>
+        <button class="btn btn-outline btn-big" onclick="App.showResultsEntry()">
+          🎯  Rellenar resultados reales
+        </button>
+      </div>
+    </div>
+
+    <p class="footer-note">Mundial 2026 · 48 selecciones · 12 grupos</p>
+  </div>
+
+  <!-- ========== PANTALLA 2: GRUPOS ========== -->
+  <div id="screen-groups" class="screen">
+    <div class="top-bar">
+      <button class="btn btn-ghost" onclick="App.goTo('welcome')">← Volver</button>
+      <div class="step-indicator">
+        <span class="step active">1</span><span class="step">2</span><span class="step">3</span><span class="step">4</span><span class="step">5</span><span class="step">6</span><span class="step">7</span><span class="step">8</span>
+      </div>
+      <span class="step-label">Fase de grupos</span>
+    </div>
+
+    <h2>📋 Predice el orden de cada grupo</h2>
+    <p class="help-text">Para cada grupo, ordena los 4 equipos del 1º al 4º. Los equipos se pueden editar.</p>
+
+    <div id="groups-container" class="groups-grid">
+      <!-- JS rellena esto -->
+    </div>
+
+    <div class="bottom-nav">
+      <button class="btn btn-primary" onclick="App.saveGroups()">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ========== PANTALLA 3: MEJORES TERCEROS ========== -->
+  <div id="screen-thirds" class="screen">
+    <div class="top-bar">
+      <button class="btn btn-ghost" onclick="App.goTo('groups')">← Volver</button>
+      <div class="step-indicator">
+        <span class="step done">1</span><span class="step active">2</span><span class="step">3</span><span class="step">4</span><span class="step">5</span><span class="step">6</span><span class="step">7</span><span class="step">8</span>
+      </div>
+      <span class="step-label">Mejores terceros</span>
+    </div>
+
+    <h2>🥉 Elige los 8 mejores terceros</h2>
+    <p class="help-text">De los 12 terceros, solo 8 pasan a dieciseisavos. Selecciónalos por orden de clasificación.</p>
+
+    <div id="thirds-container" class="thirds-list">
+      <!-- JS rellena -->
+    </div>
+
+    <div class="bottom-nav">
+      <button class="btn btn-primary" onclick="App.saveThirds()">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ========== PANTALLA 4: DIECISEISAVOS ========== -->
+  <div id="screen-r32" class="screen">
+    <div class="top-bar">
+      <button class="btn btn-ghost" onclick="App.goTo('thirds')">← Volver</button>
+      <div class="step-indicator">
+        <span class="step done">1</span><span class="step done">2</span><span class="step active">3</span><span class="step">4</span><span class="step">5</span><span class="step">6</span><span class="step">7</span><span class="step">8</span>
+      </div>
+      <span class="step-label">Dieciseisavos</span>
+    </div>
+
+    <h2>⚽ Dieciseisavos de final</h2>
+    <p class="help-text">16 partidos. Elige el ganador de cada enfrentamiento.</p>
+
+    <div id="r32-container" class="bracket-grid">
+      <!-- JS rellena -->
+    </div>
+
+    <div class="bottom-nav">
+      <button class="btn btn-primary" onclick="App.saveR32()">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ========== PANTALLA 5: OCTAVOS DE FINAL ========== -->
+  <div id="screen-r16" class="screen">
+    <div class="top-bar">
+      <button class="btn btn-ghost" onclick="App.goTo('r32')">← Volver</button>
+      <div class="step-indicator">
+        <span class="step done">1</span><span class="step done">2</span><span class="step done">3</span><span class="step active">4</span><span class="step">5</span><span class="step">6</span><span class="step">7</span><span class="step">8</span>
+      </div>
+      <span class="step-label">Octavos</span>
+    </div>
+
+    <h2>🏟️ Octavos de final</h2>
+    <p class="help-text">8 partidos. Elige el ganador de cada uno.</p>
+
+    <div class="round-section">
+      <div id="r16-container" class="bracket-grid"></div>
+    </div>
+
+    <div class="bottom-nav">
+      <button class="btn btn-primary" onclick="App.saveR16()">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ========== PANTALLA 6: CUARTOS DE FINAL ========== -->
+  <div id="screen-qf" class="screen">
+    <div class="top-bar">
+      <button class="btn btn-ghost" onclick="App.goTo('r16')">← Volver</button>
+      <div class="step-indicator">
+        <span class="step done">1</span><span class="step done">2</span><span class="step done">3</span><span class="step done">4</span><span class="step active">5</span><span class="step">6</span><span class="step">7</span><span class="step">8</span>
+      </div>
+      <span class="step-label">Cuartos</span>
+    </div>
+
+    <h2>🏟️ Cuartos de final</h2>
+    <p class="help-text">4 partidos. Elige el ganador de cada uno.</p>
+
+    <div class="round-section">
+      <div id="qf-container" class="bracket-grid"></div>
+    </div>
+
+    <div class="bottom-nav">
+      <button class="btn btn-primary" onclick="App.saveQF()">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ========== PANTALLA 7: SEMIFINALES ========== -->
+  <div id="screen-sf" class="screen">
+    <div class="top-bar">
+      <button class="btn btn-ghost" onclick="App.goTo('qf')">← Volver</button>
+      <div class="step-indicator">
+        <span class="step done">1</span><span class="step done">2</span><span class="step done">3</span><span class="step done">4</span><span class="step done">5</span><span class="step active">6</span><span class="step">7</span><span class="step">8</span>
+      </div>
+      <span class="step-label">Semifinales</span>
+    </div>
+
+    <h2>🏟️ Semifinales</h2>
+    <p class="help-text">2 partidos. Elige quién pasa a la final.</p>
+
+    <div class="round-section">
+      <div id="sf-container" class="bracket-grid"></div>
+    </div>
+
+    <div class="bottom-nav">
+      <button class="btn btn-primary" onclick="App.saveSF()">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ========== PANTALLA 8: TERCER PUESTO ========== -->
+  <div id="screen-third" class="screen">
+    <div class="top-bar">
+      <button class="btn btn-ghost" onclick="App.goTo('sf')">← Volver</button>
+      <div class="step-indicator">
+        <span class="step done">1</span><span class="step done">2</span><span class="step done">3</span><span class="step done">4</span><span class="step done">5</span><span class="step done">6</span><span class="step active">7</span><span class="step">8</span><span class="step">9</span>
+      </div>
+      <span class="step-label">3er puesto</span>
+    </div>
+
+    <h2>🥉 Tercer y cuarto puesto</h2>
+    <p class="help-text">Elige quién se lleva la medalla de bronce.</p>
+
+    <div class="round-section">
+      <div id="third-container" class="bracket-grid"></div>
+    </div>
+
+    <div class="bottom-nav">
+      <button class="btn btn-primary" onclick="App.saveThird()">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ========== PANTALLA 9: LA FINAL ========== -->
+  <div id="screen-final" class="screen">
+    <div class="top-bar">
+      <button class="btn btn-ghost" onclick="App.goTo('third')">← Volver</button>
+      <div class="step-indicator">
+        <span class="step done">1</span><span class="step done">2</span><span class="step done">3</span><span class="step done">4</span><span class="step done">5</span><span class="step done">6</span><span class="step done">7</span><span class="step active">8</span><span class="step">9</span>
+      </div>
+      <span class="step-label">Final</span>
+    </div>
+
+    <h2>🏆 La Gran Final</h2>
+    <p class="help-text">Elige al campeón del mundo.</p>
+
+    <div class="round-section final-section">
+      <div id="final-container" class="bracket-grid"></div>
+    </div>
+
+    <div class="bottom-nav">
+      <button class="btn btn-primary" onclick="App.saveFinal()">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ========== PANTALLA 10: COMPARTIR ========== -->
+  <div id="screen-share" class="screen">
+    <div class="top-bar">
+      <button class="btn btn-ghost" onclick="App.goTo('final')">← Volver</button>
+      <div class="step-indicator">
+        <span class="step done">1</span><span class="step done">2</span><span class="step done">3</span><span class="step done">4</span><span class="step done">5</span><span class="step done">6</span><span class="step done">7</span><span class="step done">8</span><span class="step active">9</span>
+      </div>
+      <span class="step-label">Compartir</span>
+    </div>
+
+    <h2>✅ ¡Porra lista!</h2>
+    <p class="help-text" id="share-username"></p>
+
+    <!-- CAMPEÓN -->
+    <div id="champion-reveal" class="champion-reveal">
+      <div class="champion-crown">👑</div>
+      <p class="champion-label">TU GANADOR ES:</p>
+      <p class="champion-name" id="champion-name"></p>
+    </div>
+
+    <div class="card share-card">
+      <p class="share-instruction">Comparte este enlace con Andrés:</p>
+      <div class="share-url-box">
+        <code id="share-url">Generando...</code>
+        <button class="btn btn-small btn-primary" onclick="App.copyLink()">📋 Copiar</button>
+      </div>
+      <p class="share-hint" id="copy-confirm"></p>
+      <p class="share-warning">⚠️ Guarda bien el enlace. Es la única forma de recuperar tu porra.</p>
+
+      <div id="share-preview" class="share-preview">
+        <h4>Resumen de tu porra:</h4>
+        <div id="share-summary"></div>
+      </div>
+    </div>
+
+    <div class="bottom-nav">
+      <button class="btn btn-secondary" onclick="App.goTo('welcome')">🏠  Volver al inicio</button>
+    </div>
+  </div>
+
+  <!-- Confeti -->
+  <div id="confetti-container"></div>
+
+  <!-- ========== PANTALLA: COMPARAR ========== -->
+  <div id="screen-compare" class="screen">
+    <div class="top-bar">
+      <button class="btn btn-ghost" onclick="App.goTo('welcome')">← Volver</button>
+      <span class="step-label">Comparar porras</span>
+    </div>
+
+    <h2>📊 Comparativa de porras</h2>
+    <p class="help-text">Pega aquí los enlaces que te han pasado tus amigos para ver todas las porras juntas.</p>
+
+    <div class="card">
+      <div class="form-group">
+        <label>Enlace de un amigo</label>
+        <div class="input-row">
+          <input type="text" id="input-friend-link" placeholder="Pega el enlace aquí..." autocomplete="off">
+          <button class="btn btn-primary" onclick="App.addFriend()">➕ Añadir</button>
+        </div>
+      </div>
+
+      <div id="friends-list" class="friends-list">
+        <p class="empty-msg">Todavía no has añadido a nadie.</p>
+      </div>
+    </div>
+
+    <div id="compare-results" class="compare-results" style="display:none;">
+      <h3>🏆 Comparación de campeones</h3>
+      <div id="champions-compare"></div>
+
+      <h3>📊 Todas las porras</h3>
+      <div id="full-compare"></div>
+    </div>
+  </div>
+
+  <!-- ========== PANTALLA: RESULTADOS REALES ========== -->
+  <div id="screen-results" class="screen">
+    <div class="top-bar">
+      <button class="btn btn-ghost" onclick="App.goTo('welcome')">← Volver</button>
+      <span class="step-label">Resultados reales</span>
+    </div>
+
+    <h2>🎯 Resultados reales del Mundial</h2>
+    <p class="help-text">Cuando acabe el Mundial, rellena los resultados reales para calcular puntos.</p>
+
+    <div class="card" id="real-results-form">
+      <h3>🏆 Campeón real</h3>
+      <div class="form-group">
+        <input type="text" id="real-champion" placeholder="¿Quién ganó el Mundial?" autocomplete="off">
+      </div>
+
+      <h3>📊 Comparar puntuaciones</h3>
+      <p class="help-text">Pega los enlaces de tus amigos para ver quién acertó más:</p>
+      <div id="results-friends-list" class="friends-list">
+        <p class="empty-msg">Añade enlaces de amigos arriba en "Comparar porras" y luego vuelve aquí.</p>
+      </div>
+
+      <div id="scores-table" style="display:none;">
+        <h3>🏅 Puntuaciones</h3>
+        <table class="scores-table">
+          <thead><tr><th>Jugador</th><th>Campeón</th><th>Puntos</th></tr></thead>
+          <tbody id="scores-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== TOAST ========== -->
+  <div id="toast" class="toast">¡Copiado!</div>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

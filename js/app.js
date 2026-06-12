@@ -1,0 +1,780 @@
+// ============================================================
+// PORRA MUNDIAL 2026 - Lógica principal
+// ============================================================
+
+const App = (() => {
+  // ─── Estado ───────────────────────────────────────────
+  let state = {
+    userName: "",
+    groups: [],           // { name, teams: [4], letter }
+    thirds: [],           // [{ groupLetter, teamName }] hasta 8
+    r32: [],              // [{ matchId, winner }]
+    r16: [],
+    qf: [],
+    sf: [],
+    final: null,
+    third: null,
+    champion: null,
+  };
+
+  let compareList = [];   // [{ userName, data }] - para comparar
+
+  // ─── Navegación ──────────────────────────────────────
+  function goTo(screenName) {
+    document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+    const target = document.getElementById("screen-" + screenName);
+    if (target) target.classList.add("active");
+    window.scrollTo(0, 0);
+
+    if (screenName === "groups") renderGroups();
+    if (screenName === "thirds") renderThirds();
+    if (screenName === "r32") renderBracket("r32", R32_MATCHES, "r32");
+    if (screenName === "r16") renderBracket("r16", R16_MATCHES, "r16");
+    if (screenName === "qf") renderBracket("qf", QF_MATCHES, "qf");
+    if (screenName === "sf") renderBracket("sf", SF_MATCHES, "sf");
+    if (screenName === "third") renderBracket("third", [THIRD_MATCH], "third");
+    if (screenName === "final") renderBracket("final", [FINAL_MATCH], "final");
+    if (screenName === "share") renderShare();
+  }
+
+  // ─── Inicio ──────────────────────────────────────────
+  function startNew() {
+    const name = document.getElementById("input-name").value.trim();
+    if (!name) { shakeInput("input-name"); return; }
+    state.userName = name;
+
+    // Inicializar grupos vacíos
+    state.groups = createGroupSlots();
+    state.thirds = [];
+    state.r32 = [];
+    state.r16 = [];
+    state.qf = [];
+    state.sf = [];
+    state.final = null;
+    state.third = null;
+    state.champion = null;
+
+    // Intentar cargar desde localStorage (para continuar una porra)
+    const local = loadFromLocalRaw();
+    if (local && local.userName === name) {
+      state.groups = local.groups || state.groups;
+      state.thirds = local.thirds || state.thirds;
+      state.r32 = local.r32 || [];
+      state.r16 = local.r16 || [];
+      state.qf = local.qf || [];
+      state.sf = local.sf || [];
+      state.final = local.final || null;
+      state.third = local.third || null;
+      state.champion = local.champion || null;
+    }
+
+    goTo("groups");
+  }
+
+  // ─── Grupos ──────────────────────────────────────────
+  function renderGroups() {
+    const container = document.getElementById("groups-container");
+    container.innerHTML = state.groups.map((g, gi) => {
+      const selectedByPos = [1, 2, 3, 4].map(p => g.order[p - 1]); // índice seleccionado en cada posición
+      const usedIndices = selectedByPos.filter(i => i !== null);
+
+      return `
+        <div class="group-card">
+          <h4>${g.name}</h4>
+          ${[0, 1, 2, 3].map(posIdx => {
+            const pos = posIdx + 1;
+            const selIdx = g.order[posIdx]; // índice del equipo en esta posición
+            // Equipos disponibles: los del pool, pero los ya usados en otras pos se deshabilitan
+            const options = g.pool.map((team, ti) => {
+              const disabled = selIdx !== ti && usedIndices.includes(ti);
+              const flag = getFlag(team);
+              return `<option value="${ti}" ${selIdx === ti ? 'selected' : ''} ${disabled ? 'disabled' : ''}>${flag} ${team}</option>`;
+            }).join("");
+            const noSelection = selIdx === null || selIdx === undefined;
+            return `
+              <div class="team-slot">
+                <span class="team-pos pos-${pos}">${pos}º</span>
+                <select data-group="${gi}" data-pos="${posIdx}" onchange="App.setTeamOrder(this)" class="team-select">
+                  <option value="" ${noSelection ? 'selected' : ''}>-- Elegir --</option>
+                  ${options}
+                </select>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }).join("");
+  }
+
+  function setTeamOrder(select) {
+    const gi = parseInt(select.dataset.group);
+    const posIdx = parseInt(select.dataset.pos);
+    const val = select.value;
+    state.groups[gi].order[posIdx] = val === "" ? null : parseInt(val);
+    renderGroups(); // Re-render para actualizar disponibilidad
+  }
+
+  function saveGroups() {
+    // Validar que todos los grupos tengan las 4 posiciones asignadas
+    for (const g of state.groups) {
+      const filled = g.order.filter(o => o !== null).length;
+      if (filled < 4) {
+        alert(`Completa las 4 posiciones del ${g.name}`);
+        return;
+      }
+      // Verificar que no haya duplicados
+      const unique = new Set(g.order);
+      if (unique.size !== 4) {
+        alert(`Hay equipos repetidos en el ${g.name}. Cada equipo solo puede ocupar una posición.`);
+        return;
+      }
+    }
+
+    // Generar lista de terceros automáticamente (preservando selección previa)
+    const oldThirds = state.thirds || [];
+    state.thirds = state.groups.map(g => {
+      const old = oldThirds.find(t => t.groupLetter === g.letter);
+      const thirdIdx = g.order[2]; // índice del 3º
+      return {
+        groupLetter: g.letter,
+        teamName: thirdIdx !== null ? g.pool[thirdIdx] : "",
+        _selected: old ? old._selected : false,
+        _rank: old ? old._rank : null,
+      };
+    });
+    saveToLocal();
+    goTo("thirds");
+  }
+
+  // ─── Mejores Terceros ────────────────────────────────
+  let selectedThirdsOrder = []; // índices en orden de selección
+
+  function renderThirds() {
+    const container = document.getElementById("thirds-container");
+    selectedThirdsOrder = state.thirds
+      .map((t, i) => t._selected ? ({ idx: i, rank: t._rank }) : null)
+      .filter(Boolean)
+      .sort((a, b) => a.rank - b.rank)
+      .map(x => x.idx);
+
+    container.innerHTML = state.thirds.map((t, i) => {
+      const selIdx = selectedThirdsOrder.indexOf(i);
+      const isSelected = selIdx >= 0;
+      const flag = getFlag(t.teamName);
+      return `
+        <div class="third-item ${isSelected ? 'selected' : ''}" onclick="App.toggleThird(${i})">
+          <span class="third-rank">${isSelected ? selIdx + 1 : ''}</span>
+          <span class="third-name">${flag} ${t.groupLetter}: ${escHtml(t.teamName)}</span>
+          <span class="third-hint">${isSelected ? 'Clasificado ' + (selIdx + 1) + '\u00ba' : 'Click para seleccionar'}</span>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function toggleThird(idx) {
+    const alreadyIdx = selectedThirdsOrder.indexOf(idx);
+    if (alreadyIdx >= 0) {
+      // Deseleccionar
+      selectedThirdsOrder.splice(alreadyIdx, 1);
+      state.thirds[idx]._selected = false;
+      state.thirds[idx]._rank = null;
+      // Re-rankea los demás
+      selectedThirdsOrder.forEach((si, rank) => {
+        state.thirds[si]._rank = rank + 1;
+      });
+    } else {
+      if (selectedThirdsOrder.length >= 8) {
+        alert("Solo puedes seleccionar 8 mejores terceros.");
+        return;
+      }
+      selectedThirdsOrder.push(idx);
+      state.thirds[idx]._selected = true;
+      state.thirds[idx]._rank = selectedThirdsOrder.length;
+    }
+    renderThirds();
+  }
+
+  function saveThirds() {
+    if (selectedThirdsOrder.length !== 8) {
+      alert("Selecciona exactamente 8 mejores terceros.");
+      return;
+    }
+    saveToLocal();
+    goTo("r32");
+  }
+
+  // ─── Brackets (genérico) ──────────────────────────────
+  function renderBracket(containerId, matches, key) {
+    const container = document.getElementById(containerId + "-container");
+    if (!container) return;
+
+    const data = state[key] || [];
+    const resolved = resolveAllMatches(state);
+
+    container.innerHTML = matches.map(m => {
+      const pick = data.find(d => d.matchId === m.id);
+      const winner = pick ? pick.winner : null;
+      const r = resolved[m.id];
+      const teamA = r ? r.homeName : (m.label.split(' vs ')[0]);
+      const teamB = r ? r.awayName : (m.label.split(' vs ')[1] || '?');
+
+      return `
+        <div class="match-card ${winner ? 'picked' : ''}">
+          <div class="match-label">P${m.id} ${m.loc ? '· ' + m.loc : ''}</div>
+          <div class="match-teams">
+            <div class="match-team ${winner === 'A' ? 'winner' : ''}"
+                 onclick="App.pickWinner('${key}',${m.id},'A')">
+              ${teamA}
+            </div>
+            <div class="match-vs">vs</div>
+            <div class="match-team ${winner === 'B' ? 'winner' : ''}"
+                 onclick="App.pickWinner('${key}',${m.id},'B')">
+              ${teamB}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function pickWinner(key, matchId, side) {
+    if (!Array.isArray(state[key])) state[key] = [];
+
+    const existing = state[key].find(d => d.matchId === matchId);
+    if (existing) {
+      existing.winner = side;
+    } else {
+      state[key].push({ matchId, winner: side });
+    }
+
+    // Re-render solo el bracket actual
+    const containerMap = {
+      r32: "r32-container", r16: "r16-container", qf: "qf-container",
+      sf: "sf-container", third: "third-container", final: "final-container",
+    };
+    const matchMap = {
+      r32: R32_MATCHES, r16: R16_MATCHES, qf: QF_MATCHES,
+      sf: SF_MATCHES, third: [THIRD_MATCH], final: [FINAL_MATCH],
+    };
+
+    // Si es final o third, solo re-render ese bracket
+    if (key === "final" || key === "third") {
+      renderBracket(containerMap[key], matchMap[key], key);
+    } else {
+      renderBracket(containerMap[key], matchMap[key], key);
+    }
+  }
+
+  function saveR32() {
+    if (!state.r32 || state.r32.length < 16) {
+      alert("Elige un ganador para cada uno de los 16 partidos de dieciseisavos.");
+      return;
+    }
+    saveToLocal();
+    goTo("r16");
+  }
+
+  function saveR16() {
+    if (!state.r16 || state.r16.length < 8) { alert("Completa los 8 partidos de octavos."); return; }
+    saveToLocal();
+    goTo("qf");
+  }
+
+  function saveQF() {
+    if (!state.qf || state.qf.length < 4) { alert("Completa los 4 partidos de cuartos."); return; }
+    saveToLocal();
+    goTo("sf");
+  }
+
+  function saveSF() {
+    if (!state.sf || state.sf.length < 2) { alert("Completa las 2 semifinales."); return; }
+    saveToLocal();
+    goTo("third");
+  }
+
+  function saveThird() {
+    if (!state.third || state.third.length < 1) { alert("Elige el ganador del tercer puesto."); return; }
+    saveToLocal();
+    goTo("final");
+  }
+
+  function saveFinal() {
+    if (!state.final || state.final.length < 1) { alert("Elige el ganador de LA FINAL."); return; }
+
+    // Campeón es el ganador de la final
+    const finalPick = state.final[0];
+    state.champion = finalPick.winner;
+
+    saveToLocal();
+    goTo("share");
+  }
+
+  // ─── Compartir ────────────────────────────────────────
+  function renderShare() {
+    document.getElementById("share-username").textContent =
+      `¡${state.userName}, tu porra está lista!`;
+
+    const url = encodeToUrl();
+    document.getElementById("share-url").textContent = url;
+
+    // Mostrar campeón
+    const resolved = resolveAllMatches(state);
+    const finalResolved = resolved[104]; // FINAL_MATCH id
+    let championName = "?";
+    if (finalResolved && state.champion) {
+      championName = state.champion === 'A' ? finalResolved.homeName : finalResolved.awayName;
+    }
+    document.getElementById("champion-name").textContent = championName;
+
+    // Lanzar confeti
+    launchConfetti();
+
+    // Resumen
+    const summary = document.getElementById("share-summary");
+    const groupsOk = state.groups.filter(g => g.order.every(o => o !== null)).length;
+    summary.innerHTML = `
+      <div class="share-summary-line">
+        📋 <strong>${groupsOk}/12 grupos completados</strong>
+      </div>
+      <div class="share-summary-line">
+        🥉 <strong>${state.thirds.filter(t => t._selected).length}/8 mejores terceros</strong>
+      </div>
+      <div class="share-summary-line">
+        ⚽ <strong>Dieciseisavos:</strong> ${(state.r32 || []).length}/16 partidos
+      </div>
+      <div class="share-summary-line">
+        🏟️ <strong>Octavos:</strong> ${(state.r16 || []).length}/8 · 
+        <strong>Cuartos:</strong> ${(state.qf || []).length}/4 · 
+        <strong>Semis:</strong> ${(state.sf || []).length}/2
+      </div>
+      <div class="share-summary-line">
+        🏆 <strong>Campeón:</strong> ${championName}
+        · 🥉 <strong>Tercero:</strong> ${state.third && state.third.length ? 'elegido' : '?'}
+      </div>
+    `;
+  }
+
+  // ─── Guardar en localStorage ─────────────────────────
+  function saveToLocal() {
+    const toSave = {
+      userName: state.userName,
+      groups: state.groups,
+      thirds: state.thirds,
+      r32: state.r32,
+      r16: state.r16,
+      qf: state.qf,
+      sf: state.sf,
+      final: state.final,
+      third: state.third,
+      champion: state.champion,
+    };
+    try {
+      localStorage.setItem("porra_mundial_2026_me", JSON.stringify(toSave));
+    } catch (e) { /* quota exceeded, ignore */ }
+  }
+
+  function loadFromLocalRaw() {
+    try {
+      const raw = localStorage.getItem("porra_mundial_2026_me");
+      if (raw) return JSON.parse(raw);
+    } catch (e) { /* ignore */ }
+    return null;
+  }
+
+  function loadFromLocal() {
+    const data = loadFromLocalRaw();
+    if (data) {
+      state = { ...state, ...data };
+      document.getElementById("input-name").value = state.userName || "";
+      return true;
+    }
+    return false;
+  }
+
+  // ─── URL Encoding/Decoding ────────────────────────────
+  function encodeToUrl() {
+    const payload = {
+      n: state.userName,
+      o: state.groups.map(g => g.order),  // solo el orden (los equipos son fijos)
+      t: state.thirds.map(t => ({ l: t.groupLetter, s: !!t._selected, r: t._rank })),
+      r32: (state.r32 || []).map(m => [m.matchId, m.winner]),
+      r16: (state.r16 || []).map(m => [m.matchId, m.winner]),
+      qf: (state.qf || []).map(m => [m.matchId, m.winner]),
+      sf: (state.sf || []).map(m => [m.matchId, m.winner]),
+      f: state.final ? state.final.map(m => [m.matchId, m.winner]) : [],
+      t3: state.third ? state.third.map(m => [m.matchId, m.winner]) : [],
+      c: state.champion,
+    };
+
+    const json = JSON.stringify(payload);
+    const encoded = btoa(unescape(encodeURIComponent(json)));
+    const base = window.location.href.split("?")[0];
+    return base + "?p=" + encoded;
+  }
+
+  function decodeFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const encoded = params.get("p");
+    if (!encoded) return null;
+
+    try {
+      const json = decodeURIComponent(escape(atob(encoded)));
+      const p = JSON.parse(json);
+
+      const groups = createGroupSlots();
+      if (p.o && Array.isArray(p.o)) {
+        p.o.forEach((order, i) => {
+          if (i < groups.length && Array.isArray(order)) {
+            groups[i].order = order.map(v => (v !== null && v !== undefined) ? v : null);
+          }
+        });
+      }
+
+      const thirds = groups.map(g => {
+        const thirdIdx = g.order[2];
+        return {
+          groupLetter: g.letter,
+          teamName: thirdIdx !== null ? g.pool[thirdIdx] : "",
+          _selected: false,
+          _rank: null,
+        };
+      });
+
+      if (p.t && Array.isArray(p.t)) {
+        p.t.forEach((t, i) => {
+          if (i < thirds.length) {
+            thirds[i]._selected = !!t.s;
+            thirds[i]._rank = t.r || null;
+          }
+        });
+      }
+
+      function parseMatches(arr) {
+        if (!arr || !Array.isArray(arr)) return [];
+        return arr.map(m => ({ matchId: m[0], winner: m[1] }));
+      }
+
+      return {
+        userName: p.n || "",
+        groups,
+        thirds,
+        r32: parseMatches(p.r32),
+        r16: parseMatches(p.r16),
+        qf: parseMatches(p.qf),
+        sf: parseMatches(p.sf),
+        final: parseMatches(p.f),
+        third: parseMatches(p.t3),
+        champion: p.c || null,
+      };
+    } catch (e) {
+      console.error("Error decoding URL:", e);
+      return null;
+    }
+  }
+
+  function copyLink() {
+    const url = document.getElementById("share-url").textContent;
+    navigator.clipboard.writeText(url).then(() => {
+      showToast("¡Enlace copiado!");
+      document.getElementById("copy-confirm").textContent = "✅ ¡Copiado! Compártelo por WhatsApp, Telegram...";
+    }).catch(() => {
+      // Fallback
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      showToast("¡Enlace copiado!");
+    });
+
+    saveToLocal();
+  }
+
+  // ─── Comparar ─────────────────────────────────────────
+  function showCompare() {
+    goTo("compare");
+    renderCompareList();
+  }
+
+  function addFriend() {
+    const input = document.getElementById("input-friend-link");
+    const raw = input.value.trim();
+    if (!raw) return;
+
+    // Extraer parámetro p=
+    let encoded;
+    try {
+      const url = new URL(raw);
+      encoded = url.searchParams.get("p");
+    } catch {
+      // Quizá es solo el parámetro
+      if (raw.startsWith("p=")) {
+        encoded = raw.substring(2);
+      } else {
+        encoded = raw;
+      }
+    }
+
+    if (!encoded) {
+      alert("No se ha podido leer el enlace. Asegúrate de que es un enlace válido.");
+      return;
+    }
+
+    try {
+      const json = decodeURIComponent(escape(atob(encoded)));
+      const p = JSON.parse(json);
+
+      // Ver si ya existe
+      if (compareList.find(c => c.userName === p.n)) {
+        alert(`${p.n} ya está en la lista.`);
+        input.value = "";
+        return;
+      }
+
+      compareList.push({ userName: p.n, raw: encoded, data: p });
+      saveCompareList();
+      renderCompareList();
+      input.value = "";
+      showToast(`¡${p.n} añadido!`);
+    } catch (e) {
+      alert("Enlace inválido. Asegúrate de copiarlo completo.");
+    }
+  }
+
+  function removeFriend(idx) {
+    compareList.splice(idx, 1);
+    saveCompareList();
+    renderCompareList();
+  }
+
+  function saveCompareList() {
+    try {
+      localStorage.setItem("porra_mundial_2026_friends", JSON.stringify(compareList.map(c => ({
+        userName: c.userName, raw: c.raw
+      }))));
+    } catch (e) { /* ignore */ }
+  }
+
+  function loadCompareList() {
+    try {
+      const raw = localStorage.getItem("porra_mundial_2026_friends");
+      if (raw) {
+        const arr = JSON.parse(raw);
+        compareList = arr.map(c => {
+          try {
+            const encoded = c.raw;
+            const json = decodeURIComponent(escape(atob(encoded)));
+            return { userName: c.userName, raw: c.raw, data: JSON.parse(json) };
+          } catch (e) {
+            return null;
+          }
+        }).filter(Boolean);
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function renderCompareList() {
+    const container = document.getElementById("friends-list");
+    if (!container) return;
+
+    if (compareList.length === 0) {
+      container.innerHTML = '<p class="empty-msg">Todavía no has añadido a nadie. Pega un enlace arriba.</p>';
+    } else {
+      container.innerHTML = compareList.map((c, i) => `
+        <div class="friend-item">
+          <span class="friend-name">👤 ${escHtml(c.userName)}</span>
+          <button class="btn btn-small btn-danger" onclick="App.removeFriend(${i})">🗑️</button>
+        </div>
+      `).join("");
+    }
+
+    renderComparison();
+  }
+
+  function renderComparison() {
+    const container = document.getElementById("compare-results");
+    const championsDiv = document.getElementById("champions-compare");
+    const fullDiv = document.getElementById("full-compare");
+
+    if (!container || compareList.length === 0) {
+      if (container) container.style.display = "none";
+      return;
+    }
+
+    container.style.display = "block";
+
+    // Campeones
+    championsDiv.innerHTML = compareList.map(c => {
+      const champ = c.data.c;
+      return `<span class="champion-badge">
+        🏆 <span class="name">Campeón lado ${champ || '?'}</span>
+        <span class="user">(${escHtml(c.userName)})</span>
+      </span>`;
+    }).join("");
+
+    // Resumen completo
+    fullDiv.innerHTML = compareList.map(c => {
+      const d = c.data;
+      const orders = d.o || [];
+      const groupsOk = orders.filter(o => Array.isArray(o) && o.every(v => v !== null)).length;
+      const thirdOk = (d.t || []).filter(t => t.s).length;
+      return `
+        <div class="card" style="margin:12px 0;">
+          <h4>👤 ${escHtml(c.userName)}</h4>
+          <div class="share-summary-line">📋 ${groupsOk}/12 grupos</div>
+          <div class="share-summary-line">🥉 ${thirdOk}/8 terceros</div>
+          <div class="share-summary-line">⚽ Dieciseisavos: ${(d.r32||[]).length}/16</div>
+          <div class="share-summary-line">🏟️ Octavos: ${(d.r16||[]).length}/8 · Cuartos: ${(d.qf||[]).length}/4 · Semis: ${(d.sf||[]).length}/2</div>
+          <div class="share-summary-line">🏆 <strong>Campeón lado: ${d.c || '?'}</strong></div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  // ─── Resultados Reales ────────────────────────────────
+  function showResultsEntry() {
+    goTo("results");
+    renderScores();
+  }
+
+  function renderScores() {
+    const scoresBody = document.getElementById("scores-body");
+    const scoresTable = document.getElementById("scores-table");
+    const realChamp = document.getElementById("real-champion").value.trim();
+
+    if (!realChamp || compareList.length === 0) {
+      if (scoresTable) scoresTable.style.display = "none";
+      return;
+    }
+
+    if (scoresTable) scoresTable.style.display = "block";
+
+    // Calcular puntuaciones (por ahora solo campeón)
+    const scores = compareList.map(c => {
+      let points = 0;
+      const champ = c.data.c;
+
+      // Punto por acertar campeón (simplificado: lado de la final)
+      // En una versión completa, se compararía con nombres reales
+      points += 10; // placeholder
+
+      return { name: c.userName, champion: champ, points };
+    });
+
+    scores.sort((a, b) => b.points - a.points);
+
+    scoresBody.innerHTML = scores.map((s, i) => `
+      <tr class="${i === 0 ? 'highlight' : ''}">
+        <td><span class="${i === 0 ? 'rank-1' : ''}">${i === 0 ? '👑' : ''} ${escHtml(s.name)}</span></td>
+        <td>Lado ${s.champion || '?'}</td>
+        <td><strong>${s.points}</strong> pts</td>
+      </tr>
+    `).join("");
+  }
+
+  // Escuchar cambios en campeón real
+  document.addEventListener("DOMContentLoaded", () => {
+    const input = document.getElementById("real-champion");
+    if (input) {
+      input.addEventListener("input", renderScores);
+    }
+  });
+
+  // ─── Utilidades ────────────────────────────────────────
+  function escHtml(str) {
+    if (!str) return "";
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function shakeInput(id) {
+    const el = document.getElementById(id);
+    el.style.borderColor = "var(--danger)";
+    el.focus();
+    setTimeout(() => { el.style.borderColor = ""; }, 1500);
+  }
+
+  function showToast(msg) {
+    const toast = document.getElementById("toast");
+    toast.textContent = msg;
+    toast.classList.add("show");
+    clearTimeout(toast._timeout);
+    toast._timeout = setTimeout(() => toast.classList.remove("show"), 2000);
+  }
+
+  // ─── Confeti ──────────────────────────────────────────
+  function launchConfetti() {
+    const container = document.getElementById("confetti-container");
+    const colors = ["#fbbf24","#ef4444","#3b82f6","#22c55e","#a855f7","#f97316","#ec4899","#06b6d4"];
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < 80; i++) {
+      const piece = document.createElement("div");
+      piece.className = "confetti-piece";
+      piece.style.left = Math.random() * 100 + "%";
+      piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+      piece.style.animationDuration = (1.5 + Math.random() * 2.5) + "s";
+      piece.style.animationDelay = Math.random() * 1.5 + "s";
+      piece.style.width = (6 + Math.random() * 8) + "px";
+      piece.style.height = (6 + Math.random() * 8) + "px";
+      frag.appendChild(piece);
+    }
+    container.innerHTML = "";
+    container.appendChild(frag);
+    // Limpiar después de la animación
+    setTimeout(() => { container.innerHTML = ""; }, 4500);
+  }
+
+  // ─── Inicialización ──────────────────────────────────
+  function init() {
+    // Intentar cargar del localStorage
+    loadCompareList();
+    const hasLocal = loadFromLocal();
+
+    if (hasLocal) {
+      document.getElementById("input-name").value = state.userName || "";
+    }
+
+    // Si se abre un enlace compartido (?p=...), añadirlo a comparación
+    const params = new URLSearchParams(window.location.search);
+    const encoded = params.get("p");
+    if (encoded) {
+      try {
+        const json = decodeURIComponent(escape(atob(encoded)));
+        const data = JSON.parse(json);
+        // Añadir automáticamente a la lista de comparación si no existe
+        if (!compareList.find(c => c.userName === data.n)) {
+          compareList.push({ userName: data.n, raw: encoded, data });
+          saveCompareList();
+        }
+      } catch (e) { /* ignorar enlaces inválidos */ }
+    }
+
+    renderCompareList();
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+
+  // ─── API Pública ──────────────────────────────────────
+  return {
+    goTo,
+    startNew,
+    setTeamOrder,
+    saveGroups,
+    toggleThird,
+    saveThirds,
+    pickWinner,
+    saveR32,
+    saveR16,
+    saveQF,
+    saveSF,
+    saveThird,
+    saveFinal,
+    copyLink,
+    showCompare,
+    addFriend,
+    removeFriend,
+    showResultsEntry,
+  };
+})();
