@@ -249,8 +249,8 @@ const App = (() => {
 
     // Re-render solo el bracket actual
     const containerMap = {
-      r32: "r32-container", r16: "r16-container", qf: "qf-container",
-      sf: "sf-container", third: "third-container", final: "final-container",
+      r32: "r32", r16: "r16", qf: "qf",
+      sf: "sf", third: "third", final: "final",
     };
     const matchMap = {
       r32: R32_MATCHES, r16: R16_MATCHES, qf: QF_MATCHES,
