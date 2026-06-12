@@ -827,3 +827,17 @@ h3 {
 }
 .bet-friend-badge strong { color: var(--accent2); }
 .bet-friend-badge.bet-is-me { border: 1px solid var(--accent); }
+
+/* ========== ADMIN RESULT ROW ========== */
+.bet-admin-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+}
+.bet-admin-row .btn { flex-shrink: 0; }
+
+/* ========== LEADERBOARD ========== */
+.leaderboard { padding: 0 0 24px 0; }

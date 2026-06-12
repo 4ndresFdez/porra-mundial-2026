@@ -22,6 +22,7 @@ const firebaseConfig = {
 let firebaseReady = false;
 let betsRef = null;
 let porrasRef = null;
+let resultsRef = null;
 
 // Solo inicializar si hay config
 if (firebaseConfig.apiKey) {
@@ -30,8 +31,9 @@ if (firebaseConfig.apiKey) {
     const db = firebase.database();
     betsRef = db.ref("bets");
     porrasRef = db.ref("porras");
+    resultsRef = db.ref("results");
     firebaseReady = true;
-    console.log("🔥 Firebase conectado - apuestas y porras en tiempo real");
+    console.log("🔥 Firebase conectado - apuestas, porras y resultados en tiempo real");
   } catch (e) {
     console.warn("Firebase no disponible, usando modo local:", e.message);
   }
@@ -91,4 +93,27 @@ function listenPorrasFB(callback) {
 // Firebase no permite . $ [ ] # / en las claves
 function sanitizeKey(name) {
   return name.replace(/[.$#[\]/]/g, "_");
+}
+
+// ============================================================
+// RESULTADOS REALES en Firebase
+// ============================================================
+
+function saveResultFB(matchId, home, away) {
+  if (!firebaseReady || !resultsRef) return;
+  resultsRef.child(matchId).set({ home, away });
+}
+
+function loadResultsFB(callback) {
+  if (!firebaseReady || !resultsRef) { callback(null); return; }
+  resultsRef.once("value").then(snapshot => {
+    callback(snapshot.val() || {});
+  }).catch(() => callback(null));
+}
+
+function listenResultsFB(callback) {
+  if (!firebaseReady || !resultsRef) return;
+  resultsRef.on("value", snapshot => {
+    callback(snapshot.val() || {});
+  });
 }

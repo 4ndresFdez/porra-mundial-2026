@@ -981,23 +981,40 @@ const App = (() => {
       if (statusEl) statusEl.textContent = "🔥 Apuestas en tiempo real (Firebase)";
       if (shareRow) shareRow.style.display = "none";
       if (copyBtn) copyBtn.style.display = "none";
+
+      // Cargar resultados reales
+      if (typeof loadResultsFB === 'function') {
+        loadResultsFB((r) => { _resultsCache = r || {}; renderBets(); renderLeaderboard(); });
+      }
     } else {
       if (statusEl) statusEl.textContent = "💾 Modo local - comparte tus apuestas con el enlace";
       if (shareRow) shareRow.style.display = "flex";
       if (copyBtn) copyBtn.style.display = "block";
+      renderLeaderboard();
     }
 
     renderBets();
 
-    // Si Firebase está activo, suscribirse a cambios en tiempo real
-    if (typeof firebaseReady !== 'undefined' && firebaseReady && typeof listenBetsFB === 'function') {
-      listenBetsFB((allBets) => {
-        _firebaseBetsCache = allBets || {};
-        const betsScreen = document.getElementById("screen-bets");
-        if (betsScreen && betsScreen.classList.contains("active")) {
-          renderBets();
-        }
-      });
+    // Firebase listeners
+    if (typeof firebaseReady !== 'undefined' && firebaseReady) {
+      if (typeof listenBetsFB === 'function') {
+        listenBetsFB((allBets) => {
+          _firebaseBetsCache = allBets || {};
+          if (document.getElementById("screen-bets")?.classList.contains("active")) {
+            renderBets();
+            renderLeaderboard();
+          }
+        });
+      }
+      if (typeof listenResultsFB === 'function') {
+        listenResultsFB((r) => {
+          _resultsCache = r || {};
+          if (document.getElementById("screen-bets")?.classList.contains("active")) {
+            renderBets();
+            renderLeaderboard();
+          }
+        });
+      }
     }
   }
 
@@ -1023,6 +1040,7 @@ const App = (() => {
 
   // Cache local de apuestas desde Firebase
   let _firebaseBetsCache = {};
+  let _resultsCache = {};
 
   function saveBet(matchId, homeBet, awayBet) {
     const userName = document.getElementById("input-name").value.trim() || "Anónimo";
@@ -1061,31 +1079,38 @@ const App = (() => {
 
     container.innerHTML = matches.map(m => {
       const isPlayed = m.homeScore !== undefined && m.awayScore !== undefined;
+      const realResult = _resultsCache[m.id];
+      const hasRealResult = realResult && realResult.home !== undefined;
+      const isTodayOrPast = m.date <= today;
       const flagH = getFlag(m.home);
       const flagA = getFlag(m.away);
 
       // Apuestas de TODOS para este partido
       const matchBets = bets[m.id] || {};
-
-      // Si usamos Firebase, matchBets es un objeto con { userName: {home, away} }
-      // Si es localStorage, es { home, away } del usuario actual
-      let allBetsHtml = "";
       const isFirebase = typeof firebaseReady !== 'undefined' && firebaseReady;
 
+      let allBetsHtml = "";
       if (isFirebase) {
-        // Firebase: mostrar todas las apuestas de todos
         const entries = Object.entries(matchBets);
         if (entries.length > 0) {
           allBetsHtml = `
             <div class="bet-friends">
               ${entries.map(([name, b]) => {
                 const isMe = name === userName;
-                return `<span class="bet-friend-badge ${isMe ? 'bet-is-me' : ''}">${isMe ? '⭐' : '👤'} ${escHtml(name)}: <strong>${b.home}-${b.away}</strong></span>`;
+                let check = "";
+                if (hasRealResult) {
+                  const exact = b.home === realResult.home && b.away === realResult.away;
+                  const winner = !exact && ((b.home > b.away && realResult.home > realResult.away) || (b.home < b.away && realResult.home < realResult.away) || (b.home === b.away && realResult.home === realResult.away));
+                  if (exact) check = " ✅";
+                  else if (winner) check = " 👏";
+                  else check = " ❌";
+                }
+                return `<span class="bet-friend-badge ${isMe ? 'bet-is-me' : ''}">${isMe ? '⭐' : '👤'} ${escHtml(name)}: <strong>${b.home}-${b.away}</strong>${check}</span>`;
               }).join("")}
             </div>`;
         }
       } else {
-        // Fallback: localStorage + friends
+        // Fallback localStorage
         let allBets = [];
         const myBet = matchBets.home !== undefined ? [{ name: userName, home: matchBets.home, away: matchBets.away, isMe: true }] : [];
         const friendBetsForMatch = friendBets.filter(fb => fb.data && fb.data[m.id])
@@ -1099,7 +1124,7 @@ const App = (() => {
         }
       }
 
-      // Mi apuesta (para inputs)
+      // Mi apuesta
       let myBet = null;
       if (isFirebase) {
         myBet = matchBets[userName] || null;
@@ -1109,20 +1134,42 @@ const App = (() => {
       }
       const isSaved = !!myBet && !isPlayed;
 
+      // Resultado real (admin)
+      let resultHtml = "";
+      if (hasRealResult) {
+        resultHtml = `<div class="bet-result">🏁 Resultado: ${realResult.home} - ${realResult.away}</div>`;
+      } else if (isTodayOrPast && hasRealResult === false && isFirebase) {
+        resultHtml = `
+          <div class="bet-admin-row">
+            <span style="font-size:11px;color:var(--text-muted)">Resultado real:</span>
+            <input type="number" class="bet-score-input" id="res-h-${m.id}" min="0" max="20" placeholder="-" inputmode="numeric" pattern="[0-9]*" style="width:36px;font-size:14px">
+            <span class="bet-score-dash">-</span>
+            <input type="number" class="bet-score-input" id="res-a-${m.id}" min="0" max="20" placeholder="-" inputmode="numeric" pattern="[0-9]*" style="width:36px;font-size:14px">
+            <button class="btn btn-small btn-primary" onclick="App.saveResultClick(${m.id})">Guardar</button>
+          </div>`;
+      }
+
+      // Status text
+      let statusHtml = "";
       if (isPlayed) {
+        statusHtml = '<span style="margin-left:auto;font-size:11px;color:var(--text-muted)">Jugado</span>';
+      }
+
+      if (isPlayed || hasRealResult) {
         return `
           <div class="bet-card played">
             <div class="bet-card-header">
               <span class="bet-time">${m.time}</span>
               <span class="bet-group">Grupo ${m.group}</span>
-              <span style="margin-left:auto;font-size:11px;color:var(--text-muted)">Jugado</span>
+              ${statusHtml}
             </div>
             <div class="bet-teams">
               <span class="bet-team-name">${flagH} ${m.home}</span>
               <span class="bet-vs-text">vs</span>
               <span class="bet-team-name">${flagA} ${m.away}</span>
             </div>
-            <div class="bet-result">Resultado: ${m.homeScore} - ${m.awayScore}</div>
+            ${isPlayed ? `<div class="bet-result">Resultado: ${m.homeScore} - ${m.awayScore}</div>` : ''}
+            ${resultHtml}
             ${allBetsHtml}
           </div>`;
       }
@@ -1149,9 +1196,12 @@ const App = (() => {
           <button class="btn btn-primary bet-save-btn" onclick="App.saveBetClick(${m.id})">
             ${isSaved ? '✅ Actualizar apuesta' : '💾 Guardar apuesta'}
           </button>
+          ${resultHtml}
           ${allBetsHtml}
         </div>`;
     }).join("");
+
+    renderLeaderboard();
   }
 
   function saveBetClick(matchId) {
@@ -1166,6 +1216,77 @@ const App = (() => {
     saveBet(matchId, hVal, aVal);
     renderBets();
     showToast("¡Apuesta guardada!");
+  }
+
+  function saveResultClick(matchId) {
+    const hInput = document.getElementById("res-h-" + matchId);
+    const aInput = document.getElementById("res-a-" + matchId);
+    const hVal = parseInt(hInput?.value);
+    const aVal = parseInt(aInput?.value);
+    if (isNaN(hVal) || isNaN(aVal)) {
+      alert("Introduce el resultado real (ej: 2-1)");
+      return;
+    }
+    if (typeof firebaseReady !== 'undefined' && firebaseReady && typeof saveResultFB === 'function') {
+      saveResultFB(matchId, hVal, aVal);
+      showToast("¡Resultado guardado!");
+    }
+  }
+
+  function renderLeaderboard() {
+    const container = document.getElementById("leaderboard-container");
+    if (!container) return;
+
+    const bets = loadBets();
+    const results = _resultsCache || {};
+    const isFirebase = typeof firebaseReady !== 'undefined' && firebaseReady;
+
+    // Acumular puntuaciones por usuario
+    const scores = {}; // { userName: { exact: 0, winner: 0, total: 0 } }
+
+    // Solo Firebase tiene apuestas de todos
+    if (isFirebase) {
+      for (const [matchId, matchBets] of Object.entries(bets)) {
+        const real = results[matchId];
+        if (!real || real.home === undefined) continue;
+        for (const [userName, bet] of Object.entries(matchBets)) {
+          if (!scores[userName]) scores[userName] = { exact: 0, winner: 0, total: 0 };
+          const exact = bet.home === real.home && bet.away === real.away;
+          const winnerOk = !exact && (
+            (bet.home > bet.away && real.home > real.away) ||
+            (bet.home < bet.away && real.home < real.away) ||
+            (bet.home === bet.away && real.home === real.away)
+          );
+          if (exact) { scores[userName].exact++; scores[userName].total += 3; }
+          else if (winnerOk) { scores[userName].winner++; scores[userName].total += 1; }
+        }
+      }
+    }
+
+    const entries = Object.entries(scores).sort((a, b) => b[1].total - a[1].total);
+
+    if (entries.length === 0) {
+      container.innerHTML = '<p class="empty-msg">Aún no hay resultados para puntuar.</p>';
+      return;
+    }
+
+    container.innerHTML = `
+      <table class="scores-table">
+        <thead><tr>
+          <th>#</th><th>Jugador</th><th>🎯 Exactos</th><th>👏 Ganador</th><th>⭐ Total</th>
+        </tr></thead>
+        <tbody>
+          ${entries.map(([name, s], i) => `
+            <tr class="${i === 0 ? 'highlight' : ''}">
+              <td><span class="${i === 0 ? 'rank-1' : ''}">${i === 0 ? '👑' : i+1}</span></td>
+              <td>${escHtml(name)}</td>
+              <td>${s.exact}</td>
+              <td>${s.winner}</td>
+              <td><strong>${s.total}</strong></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>`;
   }
 
   function formatDate(dateStr) {
@@ -1273,6 +1394,7 @@ const App = (() => {
     showResultsEntry,
     showBets,
     saveBetClick,
+    saveResultClick,
     copyBetLink,
     addFriendBet,
   };
