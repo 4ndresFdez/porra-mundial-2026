@@ -649,7 +649,6 @@ const App = (() => {
       container.innerHTML = compareList.map((c, i) => `
         <div class="friend-item">
           <span class="friend-name">👤 ${escHtml(c.userName)}</span>
-          <button class="btn btn-small btn-danger" onclick="App.removeFriend(${i})">🗑️</button>
         </div>
       `).join("");
     }
@@ -1271,7 +1270,6 @@ const App = (() => {
     copyLink,
     showCompare,
     addFriend,
-    removeFriend,
     showResultsEntry,
     showBets,
     saveBetClick,
