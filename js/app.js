@@ -1057,6 +1057,11 @@ const App = (() => {
     return "Anónimo";
   }
 
+  function isAdmin() {
+    const name = getUserName().toLowerCase();
+    return name === "andrés" || name === "andres";
+  }
+
   function loadBets() {
     // Firebase tiene prioridad; localStorage es fallback
     if (typeof firebaseReady !== 'undefined' && firebaseReady) {
@@ -1168,7 +1173,7 @@ const App = (() => {
       let resultHtml = "";
       if (hasRealResult) {
         resultHtml = `<div class="bet-result">🏁 Resultado: ${realResult.home} - ${realResult.away}</div>`;
-      } else if (isTodayOrPast && hasRealResult === false && isFirebase) {
+      } else if (isTodayOrPast && hasRealResult === false && isFirebase && isAdmin()) {
         resultHtml = `
           <div class="bet-admin-row">
             <span style="font-size:11px;color:var(--text-muted)">Resultado real:</span>
