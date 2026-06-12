@@ -25,6 +25,8 @@ const App = (() => {
     const target = document.getElementById("screen-" + screenName);
     if (target) target.classList.add("active");
     window.scrollTo(0, 0);
+    // Persistir pantalla actual para restaurar al refrescar
+    try { sessionStorage.setItem("porra_last_screen", screenName); } catch(e) {}
 
     if (screenName === "groups") renderGroups();
     if (screenName === "thirds") renderThirds();
@@ -368,17 +370,18 @@ const App = (() => {
       userName: state.userName,
       groups: state.groups,
       thirds: state.thirds,
-      r32: state.r32,
-      r16: state.r16,
-      qf: state.qf,
-      sf: state.sf,
-      final: state.final,
-      third: state.third,
-      champion: state.champion,
+      r32: state.r32, r16: state.r16, qf: state.qf, sf: state.sf,
+      final: state.final, third: state.third, champion: state.champion,
     };
+    try { localStorage.setItem("porra_mundial_2026_me", JSON.stringify(toSave)); } catch (e) {}
+  }
+
+  function saveNameToLocal(name) {
     try {
-      localStorage.setItem("porra_mundial_2026_me", JSON.stringify(toSave));
-    } catch (e) { /* quota exceeded, ignore */ }
+      const existing = loadFromLocalRaw() || {};
+      existing.userName = name;
+      localStorage.setItem("porra_mundial_2026_me", JSON.stringify(existing));
+    } catch(e) {}
   }
 
   function loadFromLocalRaw() {
@@ -941,9 +944,27 @@ const App = (() => {
     loadFriendBets();
     const hasLocal = loadFromLocal();
 
-    if (hasLocal) {
-      document.getElementById("input-name").value = state.userName || "";
+    // Restaurar nombre persistente
+    if (hasLocal && state.userName) {
+      document.getElementById("input-name").value = state.userName;
     }
+
+    // Guardar nombre al escribir
+    document.getElementById("input-name").addEventListener("input", () => {
+      const name = document.getElementById("input-name").value.trim();
+      if (name) saveNameToLocal(name);
+    });
+
+    // Restaurar última pantalla (si no es welcome ni share)
+    try {
+      const lastScreen = sessionStorage.getItem("porra_last_screen");
+      if (lastScreen && lastScreen !== "welcome" && lastScreen !== "share" && hasLocal && state.userName) {
+        goTo(lastScreen);
+        // También restaurar el foco en el input de nombre por si acaso
+        document.getElementById("input-name").value = state.userName;
+        return;
+      }
+    } catch(e) {}
 
     // Si se abre un enlace compartido (?p=...), añadirlo a comparación
     const params = new URLSearchParams(window.location.search);
@@ -1027,6 +1048,15 @@ const App = (() => {
     return { today, tomorrow: tomStr };
   }
 
+  function getUserName() {
+    if (state.userName) return state.userName;
+    const local = loadFromLocalRaw();
+    if (local && local.userName) return local.userName;
+    const input = document.getElementById("input-name");
+    if (input && input.value.trim()) return input.value.trim();
+    return "Anónimo";
+  }
+
   function loadBets() {
     // Firebase tiene prioridad; localStorage es fallback
     if (typeof firebaseReady !== 'undefined' && firebaseReady) {
@@ -1043,7 +1073,7 @@ const App = (() => {
   let _resultsCache = {};
 
   function saveBet(matchId, homeBet, awayBet) {
-    const userName = document.getElementById("input-name").value.trim() || "Anónimo";
+    const userName = getUserName();
 
     // Firebase
     if (typeof firebaseReady !== 'undefined' && firebaseReady && typeof saveBetFB === 'function') {
@@ -1070,7 +1100,7 @@ const App = (() => {
     const matches = getMatchesBetween(today, tomorrow);
     const bets = loadBets();
     const friendBets = loadFriendBets();
-    const userName = document.getElementById("input-name").value.trim() || "Anónimo";
+    const userName = getUserName();
 
     if (matches.length === 0) {
       container.innerHTML = '<div class="bets-none">🏟️ No hay partidos hoy ni mañana.<br>¡Vuelve cuando empiece la jornada!</div>';
