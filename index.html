@@ -35,6 +35,9 @@
         <button class="btn btn-outline btn-big" onclick="App.showResultsEntry()">
           🎯  Rellenar resultados reales
         </button>
+        <button class="btn btn-bets btn-big" onclick="App.showBets()">
+          💰  APUESTAS
+        </button>
       </div>
     </div>
 
@@ -259,6 +262,21 @@
 
   <!-- Confeti -->
   <div id="confetti-container"></div>
+
+  <!-- ========== PANTALLA: APUESTAS ========== -->
+  <div id="screen-bets" class="screen">
+    <div class="top-bar">
+      <button class="btn btn-ghost" onclick="App.goTo('welcome')">← Volver</button>
+      <span class="step-label">Apuestas</span>
+    </div>
+
+    <h2>💰 Apuestas del día</h2>
+    <p class="help-text" id="bets-date-range"></p>
+
+    <div id="bets-container" class="bets-list">
+      <!-- JS rellena -->
+    </div>
+  </div>
 
   <!-- ========== PANTALLA: COMPARAR ========== -->
   <div id="screen-compare" class="screen">

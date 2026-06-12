@@ -900,6 +900,122 @@ const App = (() => {
 
   document.addEventListener("DOMContentLoaded", init);
 
+  // ─── Apuestas ─────────────────────────────────────────
+  function showBets() {
+    goTo("bets");
+    renderBets();
+  }
+
+  function getTodayRange() {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomStr = tomorrow.toISOString().slice(0, 10);
+    return { today, tomorrow: tomStr };
+  }
+
+  function loadBets() {
+    try {
+      const raw = localStorage.getItem("porra_mundial_2026_bets");
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+
+  function saveBet(matchId, homeBet, awayBet) {
+    const bets = loadBets();
+    bets[matchId] = { home: homeBet, away: awayBet };
+    try {
+      localStorage.setItem("porra_mundial_2026_bets", JSON.stringify(bets));
+    } catch (e) { /* ignore */ }
+  }
+
+  function renderBets() {
+    const container = document.getElementById("bets-container");
+    const rangeLabel = document.getElementById("bets-date-range");
+    if (!container) return;
+
+    const { today, tomorrow } = getTodayRange();
+    rangeLabel.textContent = `Partidos del ${formatDate(today)} y ${formatDate(tomorrow)}`;
+
+    const matches = getMatchesBetween(today, tomorrow);
+    const bets = loadBets();
+
+    if (matches.length === 0) {
+      container.innerHTML = '<div class="bets-none">🏟️ No hay partidos hoy ni mañana.<br>¡Vuelve cuando empiece la jornada!</div>';
+      return;
+    }
+
+    container.innerHTML = matches.map(m => {
+      const isPlayed = m.homeScore !== undefined && m.awayScore !== undefined;
+      const bet = bets[m.id];
+      const isSaved = bet && !isPlayed;
+      const flagH = getFlag(m.home);
+      const flagA = getFlag(m.away);
+
+      if (isPlayed) {
+        return `
+          <div class="bet-card played">
+            <div class="bet-card-header">
+              <span class="bet-time">${m.time}</span>
+              <span class="bet-group">Grupo ${m.group}</span>
+              <span style="margin-left:auto;font-size:11px;color:var(--text-muted)">Jugado</span>
+            </div>
+            <div class="bet-teams">
+              <span class="bet-team-name">${flagH} ${m.home}</span>
+              <span class="bet-vs-text">vs</span>
+              <span class="bet-team-name">${flagA} ${m.away}</span>
+            </div>
+            <div class="bet-result">Resultado: ${m.homeScore} - ${m.awayScore}</div>
+          </div>`;
+      }
+
+      return `
+        <div class="bet-card ${isSaved ? 'saved' : ''}" id="bet-${m.id}">
+          <div class="bet-card-header">
+            <span class="bet-time">${m.time}</span>
+            <span class="bet-group">Grupo ${m.group}</span>
+            <span style="margin-left:auto;font-size:11px">${formatDate(m.date)}</span>
+          </div>
+          <div class="bet-teams">
+            <span class="bet-team-name">${flagH} ${m.home}</span>
+            <span class="bet-vs-text">vs</span>
+            <span class="bet-team-name">${flagA} ${m.away}</span>
+          </div>
+          <div class="bet-score-row">
+            <input type="number" class="bet-score-input" id="bet-h-${m.id}" min="0" max="20"
+                   value="${bet ? bet.home : ''}" placeholder="-" inputmode="numeric" pattern="[0-9]*">
+            <span class="bet-score-dash">-</span>
+            <input type="number" class="bet-score-input" id="bet-a-${m.id}" min="0" max="20"
+                   value="${bet ? bet.away : ''}" placeholder="-" inputmode="numeric" pattern="[0-9]*">
+          </div>
+          <button class="btn btn-primary bet-save-btn" onclick="App.saveBetClick(${m.id})">
+            ${isSaved ? '✅ Apuesta guardada' : '💾 Guardar apuesta'}
+          </button>
+        </div>`;
+    }).join("");
+  }
+
+  function saveBetClick(matchId) {
+    const hInput = document.getElementById("bet-h-" + matchId);
+    const aInput = document.getElementById("bet-a-" + matchId);
+    const hVal = parseInt(hInput.value);
+    const aVal = parseInt(aInput.value);
+    if (isNaN(hVal) || isNaN(aVal)) {
+      alert("Introduce los dos marcadores (ej: 2-1)");
+      return;
+    }
+    saveBet(matchId, hVal, aVal);
+    renderBets();
+    showToast("¡Apuesta guardada!");
+  }
+
+  function formatDate(dateStr) {
+    const [y, m, d] = dateStr.split("-");
+    const months = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+    return `${parseInt(d)} ${months[parseInt(m)-1]}`;
+  }
+
   // ─── API Pública ──────────────────────────────────────
   return {
     goTo,
@@ -920,5 +1036,7 @@ const App = (() => {
     addFriend,
     removeFriend,
     showResultsEntry,
+    showBets,
+    saveBetClick,
   };
 })();
