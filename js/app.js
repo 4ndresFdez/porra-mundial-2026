@@ -1058,8 +1058,8 @@ const App = (() => {
   }
 
   function isAdmin() {
-    const name = getUserName().toLowerCase();
-    return name === "andrés" || name === "andres";
+    const name = getUserName().toLowerCase().replace(/\s+/g, " ").trim();
+    return name.startsWith("andrés") || name.startsWith("andres");
   }
 
   function loadBets() {
