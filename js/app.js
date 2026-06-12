@@ -317,6 +317,14 @@ const App = (() => {
     const url = encodeToUrl();
     document.getElementById("share-url").textContent = url;
 
+    // Guardar en Firebase si está disponible
+    if (typeof firebaseReady !== 'undefined' && firebaseReady && typeof savePorraFB === 'function') {
+      const payload = buildPorraPayload();
+      savePorraFB(state.userName, payload);
+    }
+
+    // ...resto igual...
+
     // Mostrar campeón
     const resolved = resolveAllMatches(state);
     const finalResolved = resolved[104]; // FINAL_MATCH id
@@ -393,9 +401,17 @@ const App = (() => {
 
   // ─── URL Encoding/Decoding ────────────────────────────
   function encodeToUrl() {
-    const payload = {
+    const payload = buildPorraPayload();
+    const json = JSON.stringify(payload);
+    const encoded = btoa(unescape(encodeURIComponent(json)));
+    const base = window.location.href.split("?")[0];
+    return base + "?p=" + encoded;
+  }
+
+  function buildPorraPayload() {
+    return {
       n: state.userName,
-      o: state.groups.map(g => g.order),  // solo el orden (los equipos son fijos)
+      o: state.groups.map(g => g.order),
       t: state.thirds.map(t => ({ l: t.groupLetter, s: !!t._selected, r: t._rank })),
       r32: (state.r32 || []).map(m => [m.matchId, m.winner]),
       r16: (state.r16 || []).map(m => [m.matchId, m.winner]),
@@ -405,11 +421,6 @@ const App = (() => {
       t3: state.third ? state.third.map(m => [m.matchId, m.winner]) : [],
       c: state.champion,
     };
-
-    const json = JSON.stringify(payload);
-    const encoded = btoa(unescape(encodeURIComponent(json)));
-    const base = window.location.href.split("?")[0];
-    return base + "?p=" + encoded;
   }
 
   function decodeFromUrl() {
@@ -494,7 +505,55 @@ const App = (() => {
   // ─── Comparar ─────────────────────────────────────────
   function showCompare() {
     goTo("compare");
-    renderCompareList();
+
+    // Si Firebase está activo, cargar porras automáticamente
+    if (typeof firebaseReady !== 'undefined' && firebaseReady && typeof loadPorrasFB === 'function') {
+      loadPorrasFB((allPorras) => {
+        if (allPorras) {
+          // Convertir de objeto Firebase a array tipo compareList
+          compareList = Object.entries(allPorras).map(([name, data]) => ({
+            userName: data.n || name,
+            data: data,
+          }));
+          saveCompareList();
+          updateCompareStatus(true);
+          renderCompareList();
+        } else {
+          updateCompareStatus(false);
+          renderCompareList();
+        }
+      });
+
+      // También suscribirse a cambios en tiempo real
+      if (typeof listenPorrasFB === 'function') {
+        listenPorrasFB((allPorras) => {
+          if (allPorras) {
+            compareList = Object.entries(allPorras).map(([name, data]) => ({
+              userName: data.n || name,
+              data: data,
+            }));
+            saveCompareList();
+            updateCompareStatus(true);
+            renderCompareList();
+          }
+        });
+      }
+    } else {
+      updateCompareStatus(false);
+      renderCompareList();
+    }
+  }
+
+  function updateCompareStatus(hasFirebase) {
+    const statusEl = document.getElementById("compare-status");
+    if (!statusEl) return;
+    if (hasFirebase) {
+      statusEl.innerHTML = '🔥 <strong>Porras en tiempo real</strong> — se actualizan solas';
+      statusEl.style.color = 'var(--accent)';
+    } else {
+      statusEl.innerHTML = '💾 Modo local — pega los enlaces de tus amigos';
+      statusEl.style.color = 'var(--text-muted)';
+    }
   }
 
   function addFriend() {
