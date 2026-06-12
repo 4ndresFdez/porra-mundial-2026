@@ -606,29 +606,147 @@ const App = (() => {
 
     // Campeones
     championsDiv.innerHTML = compareList.map(c => {
-      const champ = c.data.c;
+      const state = friendToState(c.data);
+      const res = resolveAllMatches(state);
+      const finalR = res[104];
+      const champName = finalR ? (c.data.c === 'A' ? finalR.homeName : finalR.awayName) : '?';
       return `<span class="champion-badge">
-        🏆 <span class="name">Campeón lado ${champ || '?'}</span>
+        🏆 <span class="name">${champName}</span>
         <span class="user">(${escHtml(c.userName)})</span>
       </span>`;
     }).join("");
 
-    // Resumen completo
+    // Desglose completo por amigo
     fullDiv.innerHTML = compareList.map(c => {
+      const state = friendToState(c.data);
+      const res = resolveAllMatches(state);
       const d = c.data;
-      const orders = d.o || [];
-      const groupsOk = orders.filter(o => Array.isArray(o) && o.every(v => v !== null)).length;
-      const thirdOk = (d.t || []).filter(t => t.s).length;
+      const groupsOk = (d.o || []).filter(o => Array.isArray(o) && o.every(v => v !== null)).length;
+
+      function pickIcon(matches, matchId) {
+        const p = (matches || []).find(m => m[0] === matchId);
+        return p ? (p[1] === 'A' ? '🅰️' : '🅱️') : '⬜';
+      }
+
+      function renderMatchLabel(matchDef, matches) {
+        const r = res[matchDef.id];
+        const home = r ? r.homeName : '?';
+        const away = r ? r.awayName : '?';
+        const icon = pickIcon(matches, matchDef.id);
+        return `${icon} ${home} vs ${away}`;
+      }
+
+      // Agrupar picks por ronda
+      const r32Picks = renderRoundLines(R32_MATCHES, d.r32, res, pickIcon);
+      const r16Picks = renderRoundLines(R16_MATCHES, d.r16, res, pickIcon);
+      const qfPicks = renderRoundLines(QF_MATCHES, d.qf, res, pickIcon);
+      const sfPicks = renderRoundLines(SF_MATCHES, d.sf, res, pickIcon);
+      const thirdPick = renderRoundLines([THIRD_MATCH], d.t3, res, pickIcon);
+      const finalPick = renderRoundLines([FINAL_MATCH], d.f, res, pickIcon);
+
+      // Grupos
+      let groupsHtml = "";
+      if (d.o) {
+        groupsHtml = GROUPS.map((letter, gi) => {
+          const order = d.o[gi] || [];
+          const teams = WORLD_CUP_GROUPS[letter];
+          const ranked = order.map(idx => idx !== null ? teams[idx] : '?');
+          return `<div class="cmp-group-line">${letter}: ${ranked.map((t,i)=>`<span class="cmp-pos pos-${i+1}">${i+1}º</span> ${getFlag(t)} ${t}`).join(' · ')}</div>`;
+        }).join("");
+      }
+
+      // Terceros
+      let thirdsHtml = "";
+      if (d.t) {
+        const rankedThirds = d.t
+          .map((t, i) => ({ ...t, letter: GROUPS[i] }))
+          .filter(t => t.s)
+          .sort((a, b) => (a.r || 99) - (b.r || 99));
+        thirdsHtml = rankedThirds.map(t => {
+          const teamIdx = (d.o[t.letter.charCodeAt(0)-65] || [])[2];
+          const name = teamIdx !== null && teamIdx !== undefined ? WORLD_CUP_GROUPS[t.letter][teamIdx] : '?';
+          return `<span class="cmp-third-badge">${t.r}º ${getFlag(name)} ${name}</span>`;
+        }).join(" ");
+      }
+
       return `
-        <div class="card" style="margin:12px 0;">
+        <div class="card cmp-friend-card">
           <h4>👤 ${escHtml(c.userName)}</h4>
-          <div class="share-summary-line">📋 ${groupsOk}/12 grupos</div>
-          <div class="share-summary-line">🥉 ${thirdOk}/8 terceros</div>
-          <div class="share-summary-line">⚽ Dieciseisavos: ${(d.r32||[]).length}/16</div>
-          <div class="share-summary-line">🏟️ Octavos: ${(d.r16||[]).length}/8 · Cuartos: ${(d.qf||[]).length}/4 · Semis: ${(d.sf||[]).length}/2</div>
-          <div class="share-summary-line">🏆 <strong>Campeón lado: ${d.c || '?'}</strong></div>
+          <details class="cmp-section">
+            <summary>📋 Grupos (${groupsOk}/12)</summary>
+            <div class="cmp-groups">${groupsHtml}</div>
+          </details>
+          <details class="cmp-section">
+            <summary>🥉 Mejores terceros</summary>
+            <div class="cmp-thirds">${thirdsHtml || 'No seleccionados'}</div>
+          </details>
+          <details class="cmp-section">
+            <summary>⚽ Dieciseisavos (${(d.r32||[]).length}/16)</summary>
+            <div class="cmp-round">${r32Picks}</div>
+          </details>
+          <details class="cmp-section">
+            <summary>🏟️ Octavos (${(d.r16||[]).length}/8)</summary>
+            <div class="cmp-round">${r16Picks}</div>
+          </details>
+          <details class="cmp-section">
+            <summary>🏟️ Cuartos (${(d.qf||[]).length}/4)</summary>
+            <div class="cmp-round">${qfPicks}</div>
+          </details>
+          <details class="cmp-section">
+            <summary>🏟️ Semifinales (${(d.sf||[]).length}/2)</summary>
+            <div class="cmp-round">${sfPicks}</div>
+          </details>
+          <details class="cmp-section">
+            <summary>🥉 Tercer puesto</summary>
+            <div class="cmp-round">${thirdPick}</div>
+          </details>
+          <details class="cmp-section">
+            <summary>🏆 FINAL</summary>
+            <div class="cmp-round">${finalPick}</div>
+          </details>
         </div>
       `;
+    }).join("");
+  }
+
+  // ─── Helpers para comparación ─────────────────────────
+  function friendToState(data) {
+    const groups = createGroupSlots();
+    if (data.o) {
+      data.o.forEach((order, i) => {
+        if (i < groups.length && Array.isArray(order)) {
+          groups[i].order = order.map(v => (v !== null && v !== undefined) ? v : null);
+        }
+      });
+    }
+    const thirds = groups.map((g, i) => {
+      const thirdIdx = g.order[2];
+      const t = (data.t && data.t[i]) ? data.t[i] : {};
+      return {
+        groupLetter: g.letter,
+        teamName: thirdIdx !== null ? g.pool[thirdIdx] : "",
+        _selected: !!t.s,
+        _rank: t.r || null,
+      };
+    });
+    function pm(arr) {
+      if (!arr || !Array.isArray(arr)) return [];
+      return arr.map(m => ({ matchId: m[0], winner: m[1] }));
+    }
+    return {
+      groups, thirds,
+      r32: pm(data.r32), r16: pm(data.r16), qf: pm(data.qf), sf: pm(data.sf),
+      final: pm(data.f), third: pm(data.t3),
+    };
+  }
+
+  function renderRoundLines(matchDefs, picks, resolved, pickIcon) {
+    return matchDefs.map(m => {
+      const r = resolved[m.id];
+      const icon = pickIcon(picks, m.id);
+      const home = r ? r.homeName : '?';
+      const away = r ? r.awayName : '?';
+      return `<div class="cmp-match-line">${icon} <span class="cmp-teams">${home} vs ${away}</span></div>`;
     }).join("");
   }
 

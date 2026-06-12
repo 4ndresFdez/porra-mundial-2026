@@ -385,6 +385,54 @@ input[type="text"]:focus {
 .champion-badge .name { font-weight: 700; }
 .champion-badge .user { color: var(--text-muted); font-size: 11px; }
 
+/* ========== COMPARE DETAILS ========== */
+.cmp-friend-card { margin: 12px 0 !important; }
+.cmp-section { margin: 4px 0; }
+.cmp-section summary {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 0;
+  cursor: pointer;
+  color: var(--text-muted);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.cmp-section summary::-webkit-details-marker { display: none; }
+.cmp-section summary::before { content: "▶"; font-size: 10px; transition: transform 0.15s; }
+.cmp-section[open] summary::before { transform: rotate(90deg); }
+.cmp-section[open] summary { color: var(--text); }
+
+.cmp-groups { font-size: 11px; line-height: 1.6; padding: 4px 0 8px 12px; }
+.cmp-group-line { padding: 2px 0; color: var(--text-muted); }
+.cmp-pos {
+  display: inline-block;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  font-size: 9px; font-weight: 800;
+  text-align: center; line-height: 16px;
+}
+.cmp-pos.pos-1 { background: #fbbf24; color: #000; }
+.cmp-pos.pos-2 { background: #c0c0c0; color: #000; }
+.cmp-pos.pos-3 { background: #cd7f32; color: #fff; }
+.cmp-pos.pos-4 { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
+
+.cmp-thirds { font-size: 12px; padding: 4px 0 8px 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+.cmp-third-badge {
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.cmp-round { font-size: 12px; padding: 4px 0 8px 12px; }
+.cmp-match-line { padding: 3px 0; }
+.cmp-match-line .cmp-teams { color: var(--text-muted); }
+
 /* ========== SCORES TABLE ========== */
 .scores-table {
   width: 100%;
