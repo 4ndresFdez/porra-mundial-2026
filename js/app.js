@@ -162,7 +162,7 @@ const App = (() => {
       const isSelected = selIdx >= 0;
       const flag = getFlag(t.teamName);
       return `
-        <div class="third-item ${isSelected ? 'selected' : ''}" onclick="App.toggleThird(${i})">
+        <div class="third-item ${isSelected ? 'selected' : ''}" data-idx="${i}">
           <span class="third-rank">${isSelected ? selIdx + 1 : ''}</span>
           <span class="third-name">${flag} ${t.groupLetter}: ${escHtml(t.teamName)}</span>
           <span class="third-hint">${isSelected ? 'Clasificado ' + (selIdx + 1) + '\u00ba' : 'Click para seleccionar'}</span>
@@ -223,12 +223,12 @@ const App = (() => {
           <div class="match-label">P${m.id} ${m.loc ? '· ' + m.loc : ''}</div>
           <div class="match-teams">
             <div class="match-team ${winner === 'A' ? 'winner' : ''}"
-                 onclick="App.pickWinner('${key}',${m.id},'A')">
+                 data-key="${key}" data-match="${m.id}" data-side="A">
               ${teamA}
             </div>
             <div class="match-vs">vs</div>
             <div class="match-team ${winner === 'B' ? 'winner' : ''}"
-                 onclick="App.pickWinner('${key}',${m.id},'B')">
+                 data-key="${key}" data-match="${m.id}" data-side="B">
               ${teamB}
             </div>
           </div>
@@ -678,6 +678,32 @@ const App = (() => {
     const input = document.getElementById("real-champion");
     if (input) {
       input.addEventListener("input", renderScores);
+    }
+  });
+
+  // ─── Event delegation para clicks en bracket (móvil-friendly) ──
+  document.addEventListener("click", (e) => {
+    // Click en equipo del bracket
+    const team = e.target.closest(".match-team");
+    if (team) {
+      const key = team.dataset.key;
+      const matchId = parseInt(team.dataset.match);
+      const side = team.dataset.side;
+      if (key && matchId && side) {
+        e.preventDefault();
+        pickWinner(key, matchId, side);
+        return;
+      }
+    }
+    // Click en tercero
+    const third = e.target.closest(".third-item");
+    if (third) {
+      const idx = parseInt(third.dataset.idx);
+      if (!isNaN(idx)) {
+        e.preventDefault();
+        toggleThird(idx);
+        return;
+      }
     }
   });
 
