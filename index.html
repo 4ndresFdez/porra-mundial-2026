@@ -273,6 +273,14 @@
     <h2>💰 Apuestas del día</h2>
     <p class="help-text" id="bets-date-range"></p>
 
+    <div class="bets-bar card" style="padding:12px;margin:0 12px 8px">
+      <div class="input-row" style="margin-bottom:6px">
+        <input type="text" id="input-friend-bet-link" placeholder="Pega el enlace de apuestas de un amigo..." autocomplete="off">
+        <button class="btn btn-small btn-secondary" onclick="App.addFriendBet()">➕</button>
+      </div>
+      <button class="btn btn-small btn-outline" onclick="App.copyBetLink()" style="width:100%">📋 Copiar enlace de MIS apuestas</button>
+    </div>
+
     <div id="bets-container" class="bets-list">
       <!-- JS rellena -->
     </div>

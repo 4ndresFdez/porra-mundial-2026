@@ -874,6 +874,7 @@ const App = (() => {
   function init() {
     // Intentar cargar del localStorage
     loadCompareList();
+    loadFriendBets();
     const hasLocal = loadFromLocal();
 
     if (hasLocal) {
@@ -940,6 +941,7 @@ const App = (() => {
 
     const matches = getMatchesBetween(today, tomorrow);
     const bets = loadBets();
+    const friendBets = loadFriendBets();
 
     if (matches.length === 0) {
       container.innerHTML = '<div class="bets-none">🏟️ No hay partidos hoy ni mañana.<br>¡Vuelve cuando empiece la jornada!</div>';
@@ -952,6 +954,19 @@ const App = (() => {
       const isSaved = bet && !isPlayed;
       const flagH = getFlag(m.home);
       const flagA = getFlag(m.away);
+
+      // Apuestas de amigos para este partido
+      let friendsHtml = "";
+      const friendsForMatch = friendBets.filter(fb => fb.data && fb.data[m.id]);
+      if (friendsForMatch.length > 0) {
+        friendsHtml = `
+          <div class="bet-friends">
+            ${friendsForMatch.map(fb => {
+              const b = fb.data[m.id];
+              return `<span class="bet-friend-badge">👤 ${escHtml(fb.userName)}: <strong>${b.home}-${b.away}</strong></span>`;
+            }).join("")}
+          </div>`;
+      }
 
       if (isPlayed) {
         return `
@@ -967,6 +982,7 @@ const App = (() => {
               <span class="bet-team-name">${flagA} ${m.away}</span>
             </div>
             <div class="bet-result">Resultado: ${m.homeScore} - ${m.awayScore}</div>
+            ${friendsHtml}
           </div>`;
       }
 
@@ -992,6 +1008,7 @@ const App = (() => {
           <button class="btn btn-primary bet-save-btn" onclick="App.saveBetClick(${m.id})">
             ${isSaved ? '✅ Apuesta guardada' : '💾 Guardar apuesta'}
           </button>
+          ${friendsHtml}
         </div>`;
     }).join("");
   }
@@ -1016,6 +1033,84 @@ const App = (() => {
     return `${parseInt(d)} ${months[parseInt(m)-1]}`;
   }
 
+  // ─── Compartir apuestas con amigos ────────────────────
+  let friendBetList = [];
+
+  function loadFriendBets() {
+    try {
+      const raw = localStorage.getItem("porra_mundial_2026_friend_bets");
+      if (raw) friendBetList = JSON.parse(raw);
+    } catch (e) { friendBetList = []; }
+    return friendBetList;
+  }
+
+  function saveFriendBets() {
+    try {
+      localStorage.setItem("porra_mundial_2026_friend_bets", JSON.stringify(friendBetList));
+    } catch (e) { /* ignore */ }
+  }
+
+  function copyBetLink() {
+    const name = document.getElementById("input-name").value.trim() || "Anónimo";
+    const bets = loadBets();
+    const payload = { n: name, b: bets };
+    const json = JSON.stringify(payload);
+    const encoded = btoa(unescape(encodeURIComponent(json)));
+    const base = window.location.href.split("?")[0];
+    const url = base + "?bet=" + encoded;
+
+    navigator.clipboard.writeText(url).then(() => {
+      showToast("¡Enlace de apuestas copiado!");
+    }).catch(() => {
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      showToast("¡Enlace copiado!");
+    });
+  }
+
+  function addFriendBet() {
+    const input = document.getElementById("input-friend-bet-link");
+    const raw = input.value.trim();
+    if (!raw) return;
+
+    let encoded;
+    try {
+      const url = new URL(raw);
+      encoded = url.searchParams.get("bet");
+    } catch {
+      if (raw.startsWith("bet=")) encoded = raw.substring(4);
+      else encoded = raw;
+    }
+
+    if (!encoded) {
+      alert("Enlace inválido. Usa el enlace generado con 'Copiar enlace de MIS apuestas'.");
+      return;
+    }
+
+    try {
+      const json = decodeURIComponent(escape(atob(encoded)));
+      const data = JSON.parse(json);
+
+      if (friendBetList.find(f => f.userName === data.n)) {
+        alert(`${data.n} ya está en la lista.`);
+        input.value = "";
+        return;
+      }
+
+      friendBetList.push({ userName: data.n, raw: encoded, data: data.b });
+      saveFriendBets();
+      renderBets();
+      input.value = "";
+      showToast(`¡Apuestas de ${data.n} añadidas!`);
+    } catch (e) {
+      alert("Enlace inválido.");
+    }
+  }
+
   // ─── API Pública ──────────────────────────────────────
   return {
     goTo,
@@ -1038,5 +1133,7 @@ const App = (() => {
     showResultsEntry,
     showBets,
     saveBetClick,
+    copyBetLink,
+    addFriendBet,
   };
 })();
